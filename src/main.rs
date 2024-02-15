@@ -1,19 +1,19 @@
+#![windows_subsystem = "windows"]
+
 use std::error::Error;
-use std::io::Read;
+use std::io::Cursor;
 use std::result::Result;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::thread;
 use fltk::{app, enums, tree};
 use fltk::prelude::*;
 use fltk::button::*;
+use fltk::image::SvgImage;
 use fltk::window::*;
 use radiobrowser::blocking::RadioBrowserAPI;
 use radiobrowser::{ApiStation};
-use stream_download::http::HttpStream;
 use stream_download::http::reqwest::Client;
-use stream_download::source::SourceStream;
-use stream_download::storage::temp::TempStorageProvider;
-use stream_download::{Settings, StreamDownload};
-use log::info;
+use rodio::{Decoder, Sink};
 
 
 fn get_stations() -> Result<Vec<ApiStation>, Box<dyn Error>> {
@@ -30,41 +30,55 @@ fn get_station(stations: &MutexGuard<Vec<(String, String)>>, name: &str) -> Opti
         .map(|station| station.1.clone())
 }
 
+fn fetch_audio_data(url: String) -> Result<Vec<u8>, Box<dyn Error>> {
+    let client = Client::new();
+    println!("1");
+    let response = client.get(&url).send();
+    println!("2");
+    let bytes = response.bytes()?;
+    println!("3");
 
-async fn play_stream(url: String) -> Result<(), Box<dyn Error>> {
 
-    let (_stream, handle) = rodio::OutputStream::try_default()?;
-    let sink = rodio::Sink::try_new(&handle)?;
-    let stream = HttpStream::<Client>::create(url.parse()?,).await?;
-
-    info!("content length={:?}", stream.content_length());
-    info!("content type={:?}", stream.content_type());
-
-    let reader = StreamDownload::from_stream(stream, TempStorageProvider::default(), Settings::default())
-        .await?;
-
-    sink.append(rodio::Decoder::new(reader)?);
-
-    let handle = tokio::task::spawn_blocking(move || {
-        sink.sleep_until_end();
-    });
-    handle.await?;
-
-    Ok(())
+    Ok(bytes.to_vec())
 }
 
-#[tokio::main]
-async fn main() {
+
+
+fn play_stream(audio_data: Vec<u8>) {
+// fn play_stream(url: String) {
+
+    let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+
+    let cursor = Cursor::new(audio_data);
+    let decoder = Decoder::new(cursor).expect("Failed to decode audio data");
+
+    // Create a sink for playback
+    let sink = Sink::try_new(&stream_handle).expect("Failed to create sink for playback");
+
+    tokio::spawn(async move {
+        // Play the audio stream
+        sink.append(decoder);
+        sink.sleep_until_end();
+    });
+
+}
+
+ fn main() -> Result<(), Box<dyn Error>> {
+
     let app = app::App::default();
     let mut wind = Window::new(100, 100, 600, 600, "Radio Player");
+    wind.make_resizable(true);
+    let svg_image = SvgImage::load("./assets/RustLogo.svg").unwrap();
+    wind.set_icon(Some(svg_image.clone()));
+
     let mut get_btn = Button::new(10, 20, 100, 40, "Get Stations");
     let mut play_btn = Button::new(200, 530, 80, 40, "Play");
-    // let stop_btn = Button::new(300, 530, 80, 40, "Stop");
-    wind.make_resizable(false);
+    let stop_btn = Button::new(300, 530, 80, 40, "Stop");
 
     let mut tree = tree::Tree::default().with_size(400, 400).center_of_parent();
-    tree.set_label("Radio Stations: ");
-    tree.set_show_root(false);
+    tree.set_label("Radio Stations");
+    tree.set_root_label("Empty");
+    tree.set_show_collapse(true);
     tree.set_connector_color(enums::Color::DarkRed);
 
     let tree_clone = tree.clone();
@@ -81,12 +95,14 @@ async fn main() {
                     tracked.push((station.name.clone(), station.url.clone()));
                     tree.add(&station.name);
                 }
+                tree.set_root_label("Norway");
                 tree.redraw();
+
             }
             Err(err) => {
-                println!("Error: could not fetch stations: {}", err);
                 tree.clear();
-                tree.add("Could not fetch, try again.");
+                tree.add(&*format!("Could not fetch, try again. {err}"));
+                tree.set_root_label("ERROR");
                 tree.redraw();
             }
         }
@@ -97,10 +113,16 @@ async fn main() {
         if let Some(tree_item) = item {
             let tracked = tracked_clone.lock().unwrap();
             if let Some(url) = get_station(&tracked, &tree_item) {
-                println!("Name: {}, URL: {}", tree_item, url);
-                open::that(url);
+                // open::that(url).expect("panic message");
                 // play_stream(url.clone());
-
+                    if let Ok(audio_data) = fetch_audio_data(url.clone()) {
+                        println!("4");
+                        thread::spawn(move || {
+                        play_stream(audio_data);
+                        });
+                    } else {
+                        println!("Whops");
+                    }
             }
         }
     });
@@ -108,4 +130,6 @@ async fn main() {
     wind.end();
     wind.show();
     app.run().unwrap();
+
+    Ok(())
 }
