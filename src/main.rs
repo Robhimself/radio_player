@@ -30,16 +30,16 @@ fn get_station(stations: &MutexGuard<Vec<(String, String)>>, name: &str) -> Opti
         .map(|station| station.1.clone())
 }
 
-fn fetch_audio_data(url: String) -> Result<Vec<u8>, Box<dyn Error>> {
-    let client = Client::new();
-    println!("1");
-    let response = client.get(&url).send();
-    println!("2");
-    let bytes = response.bytes()?;
-    println!("3");
-
-
-    Ok(bytes.to_vec())
+fn fetch_audio_data(url: String) -> Result<(), Box<dyn Error>> {
+    // let client = Client::new();
+    // println!("1");
+    // let response = client.get(&url).send();
+    // println!("2");
+    // let bytes = response.bytes()?;
+    // println!("3");
+    //
+    //
+    Ok(())
 }
 
 
@@ -47,33 +47,33 @@ fn fetch_audio_data(url: String) -> Result<Vec<u8>, Box<dyn Error>> {
 fn play_stream(audio_data: Vec<u8>) {
 // fn play_stream(url: String) {
 
-    let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
-
-    let cursor = Cursor::new(audio_data);
-    let decoder = Decoder::new(cursor).expect("Failed to decode audio data");
-
-    // Create a sink for playback
-    let sink = Sink::try_new(&stream_handle).expect("Failed to create sink for playback");
-
-    tokio::spawn(async move {
-        // Play the audio stream
-        sink.append(decoder);
-        sink.sleep_until_end();
-    });
+    // let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+    //
+    // let cursor = Cursor::new(audio_data);
+    // let decoder = Decoder::new(cursor).expect("Failed to decode audio data");
+    //
+    // // Create a sink for playback
+    // let sink = Sink::try_new(&stream_handle).expect("Failed to create sink for playback");
+    //
+    // tokio::spawn(async move {
+    //     // Play the audio stream
+    //     sink.append(decoder);
+    //     sink.sleep_until_end();
+    // });
 
 }
 
  fn main() -> Result<(), Box<dyn Error>> {
 
     let app = app::App::default();
-    let mut wind = Window::new(100, 100, 600, 600, "Radio Player");
+    let mut wind = Window::new(100, 100, 600, 600, "WIP Radio Player");
     wind.make_resizable(true);
     let svg_image = SvgImage::load("./assets/RustLogo.svg").unwrap();
     wind.set_icon(Some(svg_image.clone()));
 
-    let mut get_btn = Button::new(10, 20, 100, 40, "Get Stations");
-    let mut play_btn = Button::new(200, 530, 80, 40, "Play");
-    let stop_btn = Button::new(300, 530, 80, 40, "Stop");
+    let mut get_btn = Button::new(10, 20, 80, 40, "Fetch");
+    let mut play_btn = Button::new(140, 530, 80, 40, "Open");
+    let stop_btn = Button::new(380, 530, 80, 40, "Stop");
 
     let mut tree = tree::Tree::default().with_size(400, 400).center_of_parent();
     tree.set_label("Radio Stations");
@@ -113,16 +113,16 @@ fn play_stream(audio_data: Vec<u8>) {
         if let Some(tree_item) = item {
             let tracked = tracked_clone.lock().unwrap();
             if let Some(url) = get_station(&tracked, &tree_item) {
-                // open::that(url).expect("panic message");
+                open::that(url).expect("Failed to open url in default browser.");
                 // play_stream(url.clone());
-                    if let Ok(audio_data) = fetch_audio_data(url.clone()) {
-                        println!("4");
-                        thread::spawn(move || {
-                        play_stream(audio_data);
-                        });
-                    } else {
-                        println!("Whops");
-                    }
+                //     if let Ok(audio_data) = fetch_audio_data(url.clone()) {
+                //         println!("4");
+                //         thread::spawn(move || {
+                //         play_stream(audio_data);
+                //         });
+                //     } else {
+                //         println!("Whops");
+                //     }
             }
         }
     });
