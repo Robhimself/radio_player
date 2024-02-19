@@ -109,9 +109,6 @@ async fn main() {
         }
     });
 
-    wind.end();
-    wind.show();
-
     // Callback for the window close event
     wind.handle(move |_, ev| {
         match ev {
@@ -128,6 +125,9 @@ async fn main() {
             _ => false,
         }
     });
+
+    wind.end();
+    wind.show();
     app.run().unwrap();
 }
 

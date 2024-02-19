@@ -1,11 +1,6 @@
 use anyhow::{Context, Result};
 use rodio::{OutputStream, Sink};
-use std::{
-    sync::mpsc::{self, Sender},
-    thread,
-};
-use std::sync::{Arc, Mutex};
-use lazy_static::lazy_static;
+use std::{sync::mpsc::{self, Sender}, thread};
 
 use crate::mp3_stream_decoder::Mp3StreamDecoder;
 
@@ -20,17 +15,11 @@ enum PlayerMessage {
     Stop,
 }
 
-
-lazy_static! {
-    static ref PLAYER_SINK: Arc<Mutex<Vec<Sink>>> = Arc::new(Mutex::new(Vec::new()));
-}
-
 impl Player {
     /// Creating a `Player` might be time-consuming. It might take several seconds on first run.
     pub fn try_new() -> Result<Self> {
         OutputStream::try_default().context("Audio device initialization failed")?;
         let (sender, receiver) = mpsc::channel();
-
 
         thread::spawn(move || {
                 let (_stream, stream_handle) = OutputStream::try_default().unwrap();
@@ -41,32 +30,32 @@ impl Player {
                 };
 
             loop {
-                    let response = reqwest::blocking::get(&current_listen_url).unwrap();
-                    let source = Mp3StreamDecoder::new(response).unwrap();
-                    let sink = Sink::try_new(&stream_handle).unwrap();
-                    sink.append(source);
-                    sink.set_volume(Self::map_volume_to_rodio_volume(current_volume));
+                let response = reqwest::blocking::get(&current_listen_url).unwrap();
+                let source = Mp3StreamDecoder::new(response).unwrap();
+                let sink = Sink::try_new(&stream_handle).unwrap();
+                sink.append(source);
+                sink.set_volume(Self::map_volume_to_rodio_volume(current_volume));
 
-                    while let Ok(message) = receiver.recv() {
-                        match message {
-                            PlayerMessage::Play { listen_url, volume } => {
-                                sink.stop();
-                                sink.clear();
-                                current_listen_url = listen_url;
-                                current_volume = volume;
-                                break;
-                            }
-                            PlayerMessage::Volume { volume } => {
-                                current_volume = volume;
-                                sink.set_volume(Self::map_volume_to_rodio_volume(current_volume));
-                            }
-                            PlayerMessage::Stop => {
-                                sink.stop();
-                                sink.clear();
-                            }
+                while let Ok(message) = receiver.recv() {
+                    match message {
+                        PlayerMessage::Play { listen_url, volume } => {
+                            sink.stop();
+                            sink.clear();
+                            current_listen_url = listen_url;
+                            current_volume = volume;
+                            break;
+                        }
+                        PlayerMessage::Volume { volume } => {
+                            current_volume = volume;
+                            sink.set_volume(Self::map_volume_to_rodio_volume(current_volume));
+                        }
+                        PlayerMessage::Stop => {
+                            sink.stop();
+                            sink.clear();
                         }
                     }
                 }
+            }
         });
 
         Ok(Self { sender, volume: 9 })
@@ -90,7 +79,6 @@ impl Player {
 
     pub fn set_volume(&mut self, volume: u8) {
         self.volume = Self::cap_volume(volume);
-
         self.sender
             .send(PlayerMessage::Volume {
                 volume: self.volume,
