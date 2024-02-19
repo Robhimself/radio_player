@@ -3,26 +3,22 @@ name = "radio_player"
 version = "0.1.0"
 edition = "2021"
 
-
 [dependencies]
 fltk = { version = "^1.4", features = ["fltk-bundled"] }
 radiobrowser = "*"
 rodio = "0.17.3"
 reqwest = { version = "0.11.24", features = ["blocking"] }
 tokio = { version = "1.36.0", features = ["rt", "rt-multi-thread", "macros"] }
-stream-download = "0.4.2"
-open = "5.0.1"
-log = "0.4.20"
 minimp3 = "0.5.1"
 anyhow = "1.0.79"
-winapi = {version = "0.3", features = ["wincon", "winuser"] }
+lazy_static = "1.4.0"
 
-
-[build-dependencies]
-winres = "0.1.12"
-
-
-[profile.release]
-# Set the target to GUI subsystem to prevent console from showing up
-[targets."cfg(windows)"]
-rustflags = ["-C", "link-args=/SUBSYSTEM:WINDOWS"]
+[dependencies.windows]
+version = "0.52"
+features = [
+    "Data_Xml_Dom",
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+]
